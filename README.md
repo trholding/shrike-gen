@@ -165,12 +165,68 @@ FPGA_bitstream_FLASH_MEM.bin  ← for flash-memory programming
 | `make build` | `lint` → `synth` → `pnr` → `collect` (skip update) |
 | `make lint` | Verilator lint only |
 | `make synth` | Yosys synthesis only |
+| `make flash` | Flash the project bin to FPGA |
 | `make clean` | Remove all build outputs (keeps source and constraints) |
 | `make help` | Show project help |
 
 The Makefile is **role-aware**: it detects whether it is in a workspace or project directory. Workspace targets (`init`, `project`) are unavailable inside a project, and project build targets are unavailable at the workspace root.
 
 ---
+
+## Flash
+
+```
+
+If `mpremote` is already on your system (system package, `pipx`, `uv`,
+or a prior `--user` install) it is detected and reused. Otherwise it is
+installed into the **Python user site** (`~/.local`) — no virtualenv, and
+system packages are left untouched. On PEP 668 distros (Ubuntu 24.04,
+Debian 12+) the install retries with `--break-system-packages`; paired
+with `--user` this only writes to `~/.local`, not system site-packages.
+
+`make init` is optional — `make flash` installs `mpremote` on first use
+anyway. Provision it explicitly any time with:
+
+```
+make mpremote-install
+```
+
+Overrides:
+
+| Variable        | Effect                                                       |
+| --------------- | ------------------------------------------------------------ |
+| `MPREMOTE=...`  | Use a specific mpremote (e.g. a venv's `bin/mpremote`)       |
+| `PYTHON=...`    | Use a specific interpreter for detection/install            |
+| `AUTO_INSTALL=0`| Never auto-install; error and point at `make mpremote-install` |
+
+`pip` itself must be present (`python3-pip`); it can't be bootstrapped
+without root, so install it once if missing.
+
+## Flashing
+
+`make flash` copies a bitstream onto the RP2040/RP2350 and calls the
+Shrike MicroPython `shrike.flash()` routine to configure the FPGA. This
+requires the **Shrike MicroPython UF2 already on the MCU** (see the
+getting-started guide).
+
+```
+make flash                          # current project, MCU bitstream
+make flash FROM=Blink2              # flash a sibling project's bitstream
+make flash VARIANT=FLASH_MEM        # pick a bitstream variant
+make flash PORT=/dev/ttyACM0        # target one board when several are attached
+make flash BITSTREAM=/path/to/x.bin # flash an arbitrary file
+```
+
+Resolution precedence: an explicit `BITSTREAM=` wins; otherwise `FROM=<name>`
+selects the sibling project `../<name>`; otherwise the current project.
+`FROM` assumes the other project is a sibling whose directory name matches
+its project name (true for anything `shrike-gen` scaffolds) — use
+`BITSTREAM=` for anything else.
+
+> **OTP is irreversible.** `make flash VARIANT=OTP` refuses unless you add
+> `I_KNOW_OTP_IS_FOREVER=1`. Verify against GUI-generated output and test on
+> a non-OTP target first.
+
 
 ## Advanced options 
 
@@ -218,8 +274,6 @@ The build pipeline is: **Verilator lint** → **Yosys synthesis** (EDIF netlist)
 ---
 
 ## TODO
-
-**make flash** - add flashing support
 
 **multi module** - add multi module support
 

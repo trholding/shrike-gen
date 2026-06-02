@@ -4,10 +4,11 @@
 # A project directory is identified by the presence of a *.ffpga file.
 #
 # ── WORKSPACE MODE (no *.ffpga here) ─────────────────────────────────────────
-#   make init                  create ./shrike-gen symlink (optional)
+#   make init                  create ./shrike-gen symlink + set up mpremote
 #   make project ProjectName   create a new project skeleton
 #   make project NAME=Name     (alternative syntax)
 #   make list                  list existing projects
+#   make mpremote-install      install the flash tool (mpremote) into ~/.local
 #   make help                  show this message
 #
 # ── PROJECT MODE (*.ffpga present) ───────────────────────────────────────────
@@ -16,6 +17,8 @@
 #   make build        lint → synth → pnr → collect (skip update)
 #   make lint         verilator lint only
 #   make synth        synthesis only
+#   make flash        cp bitstream to MCU + shrike.flash() the FPGA
+
 #   make clean        remove all build outputs (keeps source + constraints)
 #   make help         show this message
 
@@ -26,6 +29,30 @@ SHELL := /bin/bash
 # The presence of a *.ffpga file is the canonical marker for a project dir.
 _FFPGA_FILE := $(firstword $(wildcard *.ffpga))
 
+# ── Shared: mpremote provisioning (used by `init` in workspace mode and by
+PYTHON       ?= python3
+AUTO_INSTALL ?= 1
+MPREMOTE     ?= $(if $(shell command -v mpremote 2>/dev/null),mpremote,$(PYTHON) -m mpremote)
+
+.PHONY: mpremote-install
+
+# Install into the Python user site (~/.local) — no venv, system packages
+# untouched. Idempotent: if mpremote is importable OR on PATH (pipx/uv/system),
+# use that and install nothing. On PEP 668 distros the --user install is
+# retried with --break-system-packages (still writes only to ~/.local).
+mpremote-install:
+	@if $(PYTHON) -c "import mpremote" 2>/dev/null || command -v mpremote >/dev/null 2>&1; then \
+	  echo "  mpremote: already available"; \
+	else \
+	  echo "  mpremote: installing into user site (no venv)..."; \
+	  $(PYTHON) -m pip install --user mpremote 2>/dev/null \
+	    || $(PYTHON) -m pip install --user --break-system-packages mpremote \
+	    || { echo "  mpremote: pip install FAILED — is pip present? ($(PYTHON) -m pip --version)"; exit 1; }; \
+	  $(PYTHON) -c "import mpremote" >/dev/null 2>&1 \
+	    && echo "  mpremote: OK ($(PYTHON) -m mpremote)" \
+	    || { echo "  mpremote: not importable after install"; exit 1; }; \
+	fi
+
 ifeq (,$(_FFPGA_FILE))
 # =============================================================================
 # WORKSPACE MODE
@@ -34,18 +61,20 @@ ifeq (,$(_FFPGA_FILE))
 SHRIKE_GEN := shrike_gen/shrike-gen.py
 
 .DEFAULT_GOAL := help
-
 .PHONY: init project _project list help
 
 # ── make init ─────────────────────────────────────────────────────────────────
 init:
 	@if [ -e shrike-gen ]; then \
-		echo "  shrike-gen already exists — skipping"; \
+	  echo "  shrike-gen already exists — skipping"; \
 	else \
 		chmod +x shrike_gen/shrike-gen.py; \
 		ln -sf shrike_gen/shrike-gen.py shrike-gen; \
 		echo "  Symlink created: ./shrike-gen → shrike_gen/shrike-gen.py"; \
 	fi
+	@echo "  Setting up flash tooling..."
+	@$(MAKE) --no-print-directory mpremote-install \
+	 || echo "  mpremote: skipped — 'make flash' will retry, or run 'make mpremote-install'"
 
 # ── make project [NAME=]ProjectName ──────────────────────────────────────────
 # Also supports positional form: make project MyBlink
@@ -54,6 +83,7 @@ init:
 _POSITIONAL_NAME := $(filter-out project,$(MAKECMDGOALS))
 
 project: _project
+
 _project:
 	@name="$(or $(NAME),$(_POSITIONAL_NAME))"; \
 	if [ -z "$$name" ]; then \
@@ -66,7 +96,7 @@ _project:
 	python3 $(SHRIKE_GEN) "$$name"
 
 # Swallow the positional project name so Make doesn't error on an unknown target
-$(filter-out project list help _project init,$(MAKECMDGOALS)):
+$(filter-out project list help _project init mpremote-install,$(MAKECMDGOALS)):
 	@:
 
 # ── make list ─────────────────────────────────────────────────────────────────
@@ -85,10 +115,11 @@ help:
 	@echo ""
 	@echo "  Shrike Lite / SLG47910V shrike-gen"
 	@echo ""
-	@echo "  make init                  create ./shrike-gen symlink (optional)"
+	@echo "  make init                  create ./shrike-gen symlink + set up mpremote"
 	@echo "  make project ProjectName   create a new project"
 	@echo "  make project NAME=Name     (alternative syntax)"
 	@echo "  make list                  list existing projects"
+	@echo "  make mpremote-install       install the flash tool (mpremote) into ~/.local"
 	@echo ""
 	@echo " cd ProjectName"
 	@echo ""
@@ -98,6 +129,7 @@ help:
 	@echo "    make                            update + full build"
 	@echo "    make update                     regenerate .ffpga + io_spec_in.txt"
 	@echo "    make build                      build only (skip update)"
+	@echo "    make flash                      flash the bitstream to the FPGA"
 	@echo "    make clean                      clean build outputs"
 	@echo ""
 	@echo "  Bitstreams land in: ProjectName/ffpga/build/bitstream/"
@@ -147,7 +179,7 @@ SYNTH_YS   := $(BUILD_DIR)/synth_script.ys
 
 .DEFAULT_GOAL := all
 
-.PHONY: all update build lint synth pnr collect clean check-tools help
+.PHONY: all update build lint synth pnr collect clean check-tools flash check-mpremote help
 
 # ── all: update then full build ───────────────────────────────────────────────
 all: update build
@@ -272,6 +304,53 @@ collect:
 	fi
 	@echo "Collected outputs to $(BUILD_DIR)"
 
+# ── flash: load bitstream onto the MCU, then configure the FPGA via mpremote ──
+# VARIANT: MCU | OTP | FLASH_MEM
+VARIANT ?= MCU
+# FROM: flash another project by name, e.g. make flash FROM=Blink2
+FROM ?= $(PROJECT)
+# PORT: target a specific board, e.g. make flash PORT=/dev/ttyACM0
+PORT ?=
+MPCONNECT := $(if $(PORT),connect port:$(PORT),)
+
+# Projects are siblings under the workspace root, so a different one is ../<name>.
+ifeq ($(FROM),$(PROJECT))
+_FLASH_PROJECT_DIR := $(PROJECT_DIR)
+else
+_FLASH_PROJECT_DIR := $(PROJECT_DIR)/../$(FROM)
+endif
+
+# Override directly for an off-tree file: make flash BITSTREAM=/abs/path/to/file.bin
+BITSTREAM ?= $(_FLASH_PROJECT_DIR)/ffpga/build/bitstream/FPGA_bitstream_$(VARIANT).bin
+DEV_NAME  := $(notdir $(BITSTREAM))
+
+flash: check-mpremote
+	@test -f "$(BITSTREAM)" || { \
+	  echo "ERROR: bitstream not found:"; \
+	  echo "    $(BITSTREAM)"; \
+	  echo "  Build that project first (cd into it, run: make),"; \
+	  echo "  or pass BITSTREAM=/path/to/file.bin"; \
+	  exit 1; }
+	@if [ "$(VARIANT)" = "OTP" ] && [ "$(I_KNOW_OTP_IS_FOREVER)" != "1" ]; then \
+	  echo "REFUSING: OTP programming is irreversible."; \
+	  echo "Re-run with: make flash VARIANT=OTP I_KNOW_OTP_IS_FOREVER=1"; \
+	  exit 1; \
+	fi
+	@echo "=== Flash: $(BITSTREAM) → MCU → FPGA ==="
+	$(MPREMOTE) $(MPCONNECT) cp "$(BITSTREAM)" :
+	$(MPREMOTE) $(MPCONNECT) exec "import shrike; shrike.flash('$(DEV_NAME)')"
+	@echo "Flash OK"
+
+check-mpremote:
+	@if $(MPREMOTE) --help >/dev/null 2>&1; then \
+	  : ; \
+	elif [ "$(AUTO_INSTALL)" = "1" ]; then \
+	  $(MAKE) --no-print-directory mpremote-install; \
+	else \
+	  echo "ERROR: mpremote not found. Run: make mpremote-install"; \
+	  exit 1; \
+	fi
+
 # ── clean ─────────────────────────────────────────────────────────────────────
 clean:
 	rm -f  $(BUILD_DIR)/netlist.edif $(BUILD_DIR)/post_synth_results.v
@@ -287,12 +366,15 @@ help:
 	@echo ""
 	@echo "  $(PROJECT) — SLG47910V (Shrike Lite) build"
 	@echo ""
-	@echo "  make          update + full build"
-	@echo "  make update   regenerate .ffpga and io_spec_in.txt from io_map.pcf"
-	@echo "  make build    lint → synth → pnr → collect (skip update)"
-	@echo "  make lint     verilator lint only"
-	@echo "  make synth    synthesis only"
-	@echo "  make clean    remove build outputs"
+	@echo "  make                          update + full build"
+	@echo "  make update                   regenerate .ffpga and io_spec_in.txt from io_map.pcf"
+	@echo "  make build                    lint → synth → pnr → collect (skip update)"
+	@echo "  make lint                     verilator lint only"
+	@echo "  make synth                    synthesis only"
+	@echo "  make flash                    cp bitstream to MCU + shrike.flash() the FPGA"
+	@echo "  make flash FROM=Other         flash another project's bitstream"
+	@echo "  make flash PORT=/dev/ttyACM0  target a specific board"
+	@echo "  make clean                    remove build outputs"
 	@echo ""
 	@echo "  Edit files:"
 	@echo "    ffpga/src/main.v    Verilog source"
