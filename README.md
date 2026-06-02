@@ -9,6 +9,8 @@ Designed to replace the Go Configure Software Hub GUI with a fully scriptable, t
 **License:** MIT 
 
 ---
+## New
++ Flashing
 
 ## Motivation
 
@@ -281,13 +283,21 @@ The build pipeline is: **Verilator lint** → **Yosys synthesis** (EDIF netlist)
 
 **shrike-genify** - enable shrike-gen build for existing projects
 
-**improve pcf** - i think the pcf has to reflect the 400+ IO Planner mapping options such BRAM etc
+**improve pcf** - ipcf has to reflect the ?400+ IO Planner mapping options, add board vcf, gui gcf variants
+
+**docs / cleanup** - clean up readme, make it easy to understand
 
 ---
+
+## Contributors
+
++ @dpks2003 - Deepak Sharda
++ @trholding - Vulcan Ignis
 
 ## Gratitude / Thanks
 
 [Vicharak](https://x.com/Vicharak_In) @Vicharak_In - For making FPGAS accessible to all. And for the board they sent me. 
++ @dpks2003 - Deepak Sharda for flash support and bug fixes
 
 ---
 
