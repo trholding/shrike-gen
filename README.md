@@ -2,11 +2,11 @@
 
 CLI project scaffolding and build toolchain for Vicharak's Shrike FPGA Board and the **Renesas SLG47910V** (ForgeFPGA).
 
-Designed to replace the Go Configure Software Hub GUI with a fully scriptable, terminal-driven workflow — write Verilog, edit pin constraints, type `make`, get bitstreams.
+Designed to replace the Go Configure Software Hub GUI with a fully scriptable, terminal-driven workflow. Write Verilog (in future VHDL), edit pin constraints, type `make`, get bitstreams.
 
-**Status:** Alpha &nbsp;·&nbsp; 
-**License:** MIT &nbsp;·&nbsp; 
+**Status:** Alpha - Supports only simple projects now
 
+**License:** MIT 
 
 ---
 
@@ -223,11 +223,15 @@ The build pipeline is: **Verilator lint** → **Yosys synthesis** (EDIF netlist)
 
 **multi module** - add multi module support
 
+**support all shrike examples** - fix all bugs, enable complex projects
+
+**shrike-genify** - enable shrike-gen build for existing projects
+
 **improve pcf** - i think the pcf has to reflect the 400+ IO Planner mapping options such BRAM etc
 
 ---
 
-## ⚠️ Gratitude / Thanks
+## Gratitude / Thanks
 
 [Vicharak](https://x.com/Vicharak_In) @Vicharak_In - For making FPGAS accessible to all. And for the board they sent me. 
 
