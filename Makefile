@@ -283,7 +283,9 @@ collect:
 		PNR_PACK_PLACE.log PNR_TIMING.log PNR_ROUTE.log PNR_IO.log \
 		PNR_PLACER_REGION.log PNR_PLACER_RESOURCE.log PNR_PLACER_TIMING.log \
 		clock_tree.txt resource-utilization-report.log \
-		$(TOP)_eflx_array_wrapper.vm; do \
+		PNR_RESOURCE.log PNR_IO.v PNR_STDOUT.log PNR_OUTPUT.log \
+		PNR_TRIAL_ROUTE_TIMING.log PNR_PLACE.log RouterInfo.txt \
+		EFLX_COMPILER_last_saved.prj $(TOP)_eflx.vm $(TOP)_eflx_array_wrapper.vm; do \
 		test -f $(RUNDIR)/out/$$f && cp $(RUNDIR)/out/$$f $(BUILD_DIR)/ || true; \
 	done
 	@if [ -d $(RUNDIR)/out/minplacer ]; then \
