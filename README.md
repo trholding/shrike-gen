@@ -11,6 +11,8 @@ Designed to replace the Go Configure Software Hub GUI with a fully scriptable, t
 ---
 ## New
 + Flashing
++ Multi Modules
++ Custom top module
 
 ## Motivation
 
@@ -29,6 +31,7 @@ The following tools must be installed and on the paths the Makefile expects:
 | **Go Configure Software Hub** | Provides `yosys`, `verilator`, `eda-placer` | `/opt/go-configure-sw-hub/bin/external/` |
 | **Python 3.8+** | Runs all `gen_*.py` scripts | `python3` on `$PATH` |
 | **GNU Make** | Drives the build | `make` on `$PATH` |
+| **bash** | default supported shell | `bash` on `$PATH` |
 
 All three binary tools (`yosys v59`, `verilator`, `eda-placer v23`) ship with the Go Configure Software Hub installation. No separate tool installation is required.
 
@@ -158,6 +161,32 @@ FPGA_bitstream_FLASH_MEM.bin  ← for flash-memory programming
 
 (Note: Replace X with actual project name)
 
+```
+$ make
+
+  make init                  create ./shrike-gen symlink + set up mpremote
+  make project ProjectName   create a new project
+  make project NAME=Name     (alternative syntax)
+  make list                  list existing projects
+  make mpremote-install       install the flash tool (mpremote) into ~/.local
+
+ cd ProjectName
+
+ Then, inside the project:
+    Edit ffpga/src/main.v           edit Verilog
+    Edit io_map.pcf                 edit pin constraints
+    make                            update + full build
+    make update                     regenerate .ffpga + io_spec_in.txt
+    make build                      build only (skip update)
+    make flash                      flash the bitstream to the FPGA
+    make clean                      clean build outputs
+
+  Bitstreams land in: ProjectName/ffpga/build/bitstream/
+    FPGA_bitstream_MCU.bin
+    FPGA_bitstream_OTP.bin
+    FPGA_bitstream_FLASH_MEM.bin
+
+```
 ### Project (run from inside a project directory)
 
 | Target | Description |
@@ -170,6 +199,41 @@ FPGA_bitstream_FLASH_MEM.bin  ← for flash-memory programming
 | `make flash` | Flash the project bin to FPGA |
 | `make clean` | Remove all build outputs (keeps source and constraints) |
 | `make help` | Show project help |
+
+
+
+Inside project:
+
+```
+$ make help
+
+  <Project Name> — SLG47910V (Shrike Lite) build
+
+  make                          update + full build
+  make top                      update + build, set top module to project name (Project Name)
+  make top <ModuleName>         update + build, set top module to <ModuleName>
+  make update                   regenerate .ffpga and io_spec_in.txt from io_map.pcf
+  make build                    lint → synth → pnr → collect (skip update)
+  make lint                     verilator lint only
+  make synth                    synthesis only
+  make flash                    cp bitstream to MCU + shrike.flash() the FPGA
+  make flash FROM=Other         flash another project's bitstream
+  make flash PORT=/dev/ttyACM0  target a specific board
+  make clean                    remove build outputs
+
+  Edit files:
+    ffpga/src/*.v       Verilog sources (all .v files are picked up automatically)
+    io_map.pcf          pin constraints
+
+  Sources detected: main.v
+
+  Bitstreams land in: ffpga/build/bitstream/
+    FPGA_bitstream_MCU.bin
+    FPGA_bitstream_OTP.bin
+    FPGA_bitstream_FLASH_MEM.bin
+
+
+```
 
 The Makefile is **role-aware**: it detects whether it is in a workspace or project directory. Workspace targets (`init`, `project`) are unavailable inside a project, and project build targets are unavailable at the workspace root.
 
@@ -277,13 +341,11 @@ The build pipeline is: **Verilator lint** → **Yosys synthesis** (EDIF netlist)
 
 ## TODO
 
-**multi module** - add multi module support
-
 **support all shrike examples** - fix all bugs, enable complex projects
 
 **shrike-genify** - enable shrike-gen build for existing projects
 
-**improve pcf** - ipcf has to reflect the ?400+ IO Planner mapping options, add board vcf, gui gcf variants
+**improve pcf** - pcf has to reflect the ?400+ IO Planner mapping options, add board vcf, gui gcf variants
 
 **docs / cleanup** - clean up readme, make it easy to understand
 
@@ -293,11 +355,19 @@ The build pipeline is: **Verilator lint** → **Yosys synthesis** (EDIF netlist)
 
 + @dpks2003 - Deepak Sharda
 + @trholding - Vulcan Ignis
++ @multigcs - Oliver Dippel
 
 ## Gratitude / Thanks
 
-[Vicharak](https://x.com/Vicharak_In) @Vicharak_In - For making FPGAS accessible to all. And for the board they sent me. 
++ [Vicharak](https://x.com/Vicharak_In) @Vicharak_In - For making FPGAS accessible to all. And for the board they sent me. 
 + @dpks2003 - Deepak Sharda for flash support and bug fixes
++ @multigcs - Oliver Dippel / set top module fix
+
+---
+
+## ⚠️ Notable projects/forks that use shrike-gen or parts
+
++ [riocore](https://github.com/multigcs/riocore) - Realtime-IO for Motion-Control by @multigcs
 
 ---
 
