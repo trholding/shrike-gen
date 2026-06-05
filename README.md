@@ -6,18 +6,20 @@ Write Verilog, edit pin constraints, type `make` and get bitstreams. No GUI requ
 
 `shrike-gen` replaces the Go Configure Software Hub GUI with a fully scriptable, terminal-driven workflow. The generated `.ffpga` files and all three bitstream formats (`MCU`, `OTP`, `FLASH_MEM`) are byte-compatible with the GUI. You can still open a project in the GUI, but you don't have to.
 
-**Status:** Alpha, simple projects supported  
+**Status:** Alpha - Simple projects supported 
 **License:** MIT
 
 ---
 
 ## What's New
 
-**Flashing:** `make flash` copies a bitstream onto the RP2040/RP2350 and calls `shrike.flash()`. Supports per-project, cross-project, and arbitrary file targets. `mpremote` is auto-installed the irst time after `make init` or `make flash`. Credit: @dpks2003
+**Flashing:** `make flash` copies a bitstream onto the RP2040/RP2350 and calls `shrike.flash()`. Supports per-project, cross-project, and arbitrary file targets. `mpremote` is auto-installed the first time after `make init` or `make flash`. Credit: @dpks2003
 
 **Multi-module support:** All `.v` files in `ffpga/src/` are picked up automatically. Add new source files and run `make update`; the `.ffpga` and `read_verilog` list both stay in sync with no manual edits.
 
 **Explicit top module:** `make top` passes `-top $(TOP)` (from `shrike.mk`) to Yosys. `make top <ModuleName>` overrides with any name. Useful when auto-detection doesnt work when no module is annotated with (* top *). Fix suggested by: @multigcs
+
+**Verilator optional:** The bundled `verilator_bin` requires `GLIBC_2.38` and will not run on Debian 12 or older distributions. Lint can now be skipped by passing `VERILATOR=` on the command line, or a working verilator path can be specified. Width related lint warnings (`WIDTHEXPAND`/`WIDTHTRUNC`) are suppressed by default for less noisy builds. Contributed by: @multigcs
 
 ---
 
@@ -31,6 +33,8 @@ Write Verilog, edit pin constraints, type `make` and get bitstreams. No GUI requ
 - [Flashing](#flashing)
 - [Python scripts reference](#python-scripts-reference)
 - [Advanced options](#advanced-options)
+  - [Skipping or replacing Verilator](#skipping-or-replacing-verilator)
+  - [Lint warning suppressions](#lint-warning-suppressions)
 - [How it works](#how-it-works)
 - [Notable projects, forks or usage](#notable-projects-forks-or-usage)
 - [Contributors](#contributors)
@@ -48,6 +52,8 @@ Write Verilog, edit pin constraints, type `make` and get bitstreams. No GUI requ
 | **bash** | Shell | `bash` on `$PATH` |
 
 All three binary tools (`yosys v59`, `verilator`, `eda-placer v23`) ship inside the Go Configure Software Hub installation at `/opt/go-configure-sw-hub/bin/external/`. No separate tool installation is needed.
+
+> **Verilator compatibility note:** The bundled `verilator_bin` requires `GLIBC_2.38` and will not run on Debian 12 or other distributions that ship an older glibc. If you hit a `version 'GLIBC_2.38' not found` error, see [Skipping or replacing Verilator](#skipping-or-replacing-verilator) below.
 
 ---
 
@@ -388,6 +394,41 @@ Produces `.bin` and `.txt` files for `MCU`, `OTP`, and `FLASH_MEM` variants. All
 
 ## Advanced options
 
+### Skipping or replacing Verilator
+
+By default the Makefile uses the `verilator_bin` bundled with Go Configure Software Hub. That binary requires `GLIBC_2.38`, which is not available on Debian 12 or distributions shipping an older glibc. If you hit:
+
+```
+verilator_bin: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.38' not found
+```
+
+**Skip lint entirely** by passing an empty `VERILATOR` on the command line:
+
+```bash
+make VERILATOR=
+```
+
+This works for any make target `make build VERILATOR=`, `make synth VERILATOR=`, etc. Lint is skipped and the rest of the build (Yosys synthesis, PnR) runs normally.
+
+**Use a different Verilator** by pointing at any compatible binary:
+
+```bash
+make lint VERILATOR=/usr/bin/verilator_bin
+make build VERILATOR=/usr/bin/verilator_bin
+```
+
+A system installed Verilator should work fine as a drop-in replacement.
+
+> Note: `make lint` on its own always requires a working Verilator. Only the full build pipeline (`make`, `make build`, `make synth`) can skip lint via `VERILATOR=`.
+
+---
+
+### Lint warning suppressions
+
+The linter now runs with `-Wno-WIDTHEXPAND` and `-Wno-WIDTHTRUNC`, which suppresses warnings about implicit bit-width changes in assignments. These are silenced because the many common Verilog coding patterns can trigger them frequently without indicating real bugs.
+
+---
+
 ### Custom top-level module name
 
 ```bash
@@ -474,7 +515,7 @@ Each generator implements part of the Go Configure Software Hub's internal forma
 |---|---|
 | [@trholding](https://github.com/trholding) | Vulcan Ignis, original author |
 | [@dpks2003](https://github.com/dpks2003) | Deepak Sharda, flash support and bug fixes |
-| [@multigcs](https://github.com/multigcs) | Oliver Dippel, set top module fix |
+| [@multigcs](https://github.com/multigcs) | Oliver Dippel, set top module fix, skip lint + lint warning suppressions |
 
 **Thanks to [Vicharak](https://x.com/Vicharak_In)** for making FPGAs accessible, and for the board.
 
