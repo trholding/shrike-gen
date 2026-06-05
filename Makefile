@@ -3,7 +3,7 @@
 # Role-aware: automatically detects workspace vs project context.
 # A project directory is identified by the presence of a *.ffpga file.
 #
-# ── WORKSPACE MODE (no *.ffpga here) ─────────────────────────────────────────
+# ── WORKSPACE MODE (no *.ffpga here / shrike.mk) ─────────────────────────────
 #   make init                  create ./shrike-gen symlink + set up mpremote
 #   make project ProjectName   create a new project skeleton
 #   make project NAME=Name     (alternative syntax)
@@ -11,19 +11,18 @@
 #   make mpremote-install      install the flash tool (mpremote) into ~/.local
 #   make help                  show this message
 #
-# ── PROJECT MODE (*.ffpga present) ───────────────────────────────────────────
-#   make              update + full build (no explicit top module)
-#   make top          update + build with -top <ProjectName>
-#   make top <Name>   update + build with -top <Name>
-#   make update       regenerate .ffpga and io_spec_in.txt from io_map.pcf
-#                     (also re-scans ffpga/src/*.v — picks up new/renamed files)
-#   make build        lint → synth → pnr → collect (skip update)
-#   make lint         verilator lint only
-#   make synth        synthesis only
-#   make flash        cp bitstream to MCU + shrike.flash() the FPGA
-
-#   make clean        remove all build outputs (keeps source + constraints)
-#   make help         show this message
+# ── PROJECT MODE (*.ffpga / shrike.mk present) ───────────────────────────────
+#   make                       update + full build (if top module annotated with (* top *))
+#   make top                   update + build with -top TOP from shrike.mk
+#   make top <TopModuleName>   update + build with -top <TopModuleName>
+#   make update                regenerate .ffpga and io_spec_in.txt from io_map.pcf
+#                              (also re-scans ffpga/src/*.v — picks up new/renamed files)
+#   make build                 lint → synth → pnr → collect (skip update)
+#   make lint                  verilator lint only
+#   make synth                 synthesis only
+#   make flash                 copy bitstream to MCU + shrike.flash() the FPGA
+#   make clean                 remove all build outputs (keeps source + constraints)
+#   make help                  show help message
 
 #Setting Up default shell as bash 
 SHELL := /bin/bash
@@ -179,9 +178,9 @@ VSRC_BASENAMES := $(notdir $(VSRC_FILES))
 SYNTH_VFILES   := $(patsubst %,"../src/%",$(VSRC_BASENAMES))
 
 # ── Top-module handling ───────────────────────────────────────────────────────
-#   make                 → no -top flag (yosys auto-detects)
-#   make top             → synth_xilinx ... -top <PROJECT>
-#   make top <ModName>   → synth_xilinx ... -top <ModName>
+#   make                       → no -top flag (yosys auto-detects (* top *))
+#   make top                   → synth_xilinx ... -top TOP from shrike.mk
+#   make top <TopModuleName>   → synth_xilinx ... -top <TopModuleName>
 _KNOWN_MAKE_TARGETS := all update build lint synth pnr collect clean check-tools \
                        flash check-mpremote help top mpremote-install
 _TOP_MODULE_ARG     := $(filter-out $(_KNOWN_MAKE_TARGETS),$(MAKECMDGOALS))
@@ -190,7 +189,7 @@ ifeq (top,$(filter top,$(MAKECMDGOALS)))
   ifneq (,$(_TOP_MODULE_ARG))
     SYNTH_TOP_FLAG := -top $(_TOP_MODULE_ARG)
   else
-    SYNTH_TOP_FLAG := -top $(PROJECT)
+    SYNTH_TOP_FLAG := -top $(TOP)
   endif
 else
   SYNTH_TOP_FLAG :=
@@ -211,8 +210,9 @@ SYNTH_YS   := $(BUILD_DIR)/synth_script.ys
 all: update build
 
 # ── top: update then full build with explicit -top flag ───────────────────────
-# Usage: make top               → -top <PROJECT>
-#        make top <ModuleName>  → -top <ModuleName>
+# Usage: make top                  → -top TOP from shrike.mk
+#        make top <TopModuleName>  → -top <TopModuleName>
+# This is needed when the top module is not annotated with (* top *)
 top: update build
 
 # Swallow the positional module-name argument so Make doesn't error on it
@@ -403,9 +403,9 @@ help:
 	@echo ""
 	@echo "  $(PROJECT) — SLG47910V (Shrike Lite) build"
 	@echo ""
-	@echo "  make                          update + full build"
-	@echo "  make top                      update + build, set top module to project name ($(PROJECT))"
-	@echo "  make top <ModuleName>         update + build, set top module to <ModuleName>"
+	@echo "  make                          update + full build [(* top *)]"
+	@echo "  make top                      update + build, set top module to TOP (shrike.mk)"
+	@echo "  make top <TopModuleName>      update + build, set top module to custom <TopModuleName>"
 	@echo "  make update                   regenerate .ffpga and io_spec_in.txt from io_map.pcf"
 	@echo "  make build                    lint → synth → pnr → collect (skip update)"
 	@echo "  make lint                     verilator lint only"
