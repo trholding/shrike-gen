@@ -1,6 +1,6 @@
 # shrike-gen
 
-#### CLI project scaffolding and build toolchain for the **Renesas SLG47910V** (ForgeFPGA) and the [Vicharak Shrike Lite](https://x.com/Vicharak_In) board.
+#### CLI Makefile based project scaffolding, build and flashing for **Renesas SLG47910V** (ForgeFPGA) and the [Vicharak Shrike Lite](https://x.com/Vicharak_In) board.
 
 Write Verilog, edit pin constraints, type `make` and get bitstreams. No GUI required.
 
