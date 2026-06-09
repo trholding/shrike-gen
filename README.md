@@ -37,7 +37,7 @@ Write Verilog or VHDL, edit pin constraints, type `make` and get bitstreams. No 
 - [Python scripts reference](#python-scripts-reference)
 - [Advanced options](#advanced-options)
 - [How it works](#how-it-works)
-- [Notable projects, forks or usage](#notable-projects-usage-or-forks)
+- [Notable Projects, Usage, Forks or Alternatives](#notable-projects-usage-forks-or-alternatives)
 - [Contributors](#contributors)
 - [Credits](#credits)
 - [TODO](#todo)
@@ -598,16 +598,21 @@ Each generator implements part of the Go Configure Software Hub's internal forma
 
 ---
 
-## Notable Projects, Usage or Forks
+## Notable Projects, Usage, Forks or Alternatives
 
 #### Notable Projects
 - **[shrike](https://github.com/vicharak-in/shrike)**: Low cost microcontroller + FPGA board for makers , hobbyist and student for endless possibility, by [@vicharak-in](https://github.com/vicharak-in)
 
 - **[LogicCard-VHDL](https://github.com/annoyedmilk/LogicCard-VHDL)**: VHDL examples for ForgeFPGA / LogicCard, by [@annoyedmilk](https://github.com/annoyedmilk)
 
+#### Notable Alternatives
+
+- **[shrike-starter](https://github.com/visejak/shrike-starter)**: Get a design running on the Vicharak Shrike Lite board super quickly and without the vendor GUI by [@visejak](https://github.com/visejak)
+
+> Special thanks to [@visejak](https://github.com/visejak) for [shrike-starter](https://github.com/visejak/shrike-starter) ([announcement](https://x.com/visejak/status/2063979878161027450?s=20)), he is a great guy! Please follow him on X, also here, and watch out for his work on **supporting SLG47910V in nextpnr**! 
+
 #### Notable Usage
 - **[riocore](https://github.com/multigcs/riocore)**: Realtime-IO for motion control, by [@multigcs](https://github.com/multigcs)
-
 
 ---
 
